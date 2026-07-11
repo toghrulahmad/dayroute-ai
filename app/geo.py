@@ -35,3 +35,23 @@ def geocode_place(place_name: str, city: str) -> dict | None:
         time.sleep(1)  # Nominatim rate limit qaydası: saniyədə 1 sorğu
 
     return None
+
+
+def get_travel_time_matrix(coordinates: list[dict]) -> list[list[float]]:
+    """
+    Koordinatlar siyahısı arasında gediş vaxtı matrisini qaytarır (dəqiqə).
+    coordinates: [{"lat": .., "lon": ..}, ...]
+    """
+    coords_str = ";".join(f"{c['lon']},{c['lat']}" for c in coordinates)
+    url = f"{OSRM_URL}/{coords_str}"
+    params = {"annotations": "duration"}
+
+    response = httpx.get(url, params=params, timeout=15)
+    data = response.json()
+
+    durations_seconds = data["durations"]
+    durations_minutes = [
+        [round(sec / 60, 1) if sec is not None else None for sec in row]
+        for row in durations_seconds
+    ]
+    return durations_minutes
