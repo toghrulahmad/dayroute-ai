@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from typing import List
+import httpx
 from app.geo import geocode_place, get_travel_time_matrix
 from app.routing import build_route
 from app.discovery import discover_places, explain_route
@@ -12,6 +13,7 @@ from app import models, schemas
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DayRoute AI")
+N8N_WEBHOOK_URL = "https://rough-sessions-immune-birthday.trycloudflare.com/webhook/dayroute-notify"
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -109,7 +111,19 @@ def generate_route(request: RouteRequest, db: Session = Depends(get_db)):
     explanation = explain_route(
         route["selected"], route["excluded"], route["total_time"], request.time_limit_minutes
     )
-
+    try:
+        with httpx.Client() as client:
+            client.post(
+                N8N_WEBHOOK_URL,
+                json={
+                    "city": request.city,
+                    "selected_count": len(route["selected"]),
+                    "total_time": route["total_time"],
+                },
+                timeout=5,
+            )
+    except Exception as e:
+        print(f"n8n bildirişi göndərilmədi: {e}")
     return {
         "city": request.city,
         "selected_places": route["selected"],
